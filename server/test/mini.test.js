@@ -114,7 +114,7 @@ describe('Mini sala: dibujo', () => {
       const m = model({ compact, cols, bubbles: { Flor: { text: '👋', emote: true, until: Date.now() + 9e3 }, Ludwing: { text: 'hola ☕ equipo', until: Date.now() + 9e3 } } });
       M.syncEntities(m, Math.random);
       const lines = M.buildFrame(m);
-      assert.equal(lines.length, compact ? 11 : 18);
+      assert.equal(lines.length, compact ? 12 : 18);
       for (const l of lines) assert.equal(M.textWidth(strip(l)), cols, `${compact ? 'chico' : 'grande'} ${cols}: ${JSON.stringify(strip(l)).slice(0, 60)}`);
     }
   });
@@ -215,4 +215,25 @@ test('el tiempo de "tu Claude está trabajando" no depende de que los relojes de
 test('si estás en modo invisible, la mini te lo recuerda', () => {
   const m = { cols: 100, compact: true, truecolor: true, me: 'Yo', users: [], ents: [], bubbles: {}, flash: null, doneUntil: 0, now: Date.now(), input: null, connected: true, meInfo: { hidden: true, claude: { state: 'idle' } } };
   assert.match(M.buildFrame(m).map(strip)[0], /Estás invisible/);
+});
+
+test('franja de Claude Code: 7 filas, sin piso, mascotas chicas bien dibujadas y la cara quieta al parpadear', () => {
+  const Sprites = require('../../plugin/scripts/sprites.js');
+  for (const [kind, frames] of Object.entries(M.TINY_PETS)) {
+    assert.ok(Sprites.PETS[kind], kind);
+    const pal = Sprites.petPal(kind);
+    for (const rows of Object.values(frames)) {
+      assert.ok(rows.every((r) => r.length === rows[0].length), `${kind}: filas del mismo ancho`);
+      for (const ch of rows.join('')) assert.ok(ch === '.' || pal[ch], `${kind}: color ${ch}`);
+    }
+  }
+  const u = { avatar: { species: 'humano', hair: 'corto', top: 'remera' } };
+  const q = Sprites.spriteGrid(u, 'quieto').rows;
+  assert.equal(M.chibiRows(Sprites.spriteGrid(u, 'parpadeo').rows, q).length, M.chibiRows(q).length);
+  const m = { cols: 80, compact: true, franja: true, truecolor: true, me: 'Ana', meInfo: null, ents: [], bubbles: {}, flash: null, doneUntil: 0, now: Date.now(), input: null, connected: true,
+    users: [{ name: 'Ana', web: true, claude: 'working', avatar: u.avatar, pet: { kind: 'perrito' } }] };
+  M.syncEntities(m);
+  const lines = M.buildFrame(m);
+  assert.equal(lines.length, 7);
+  assert.ok(lines.map(strip).join('').includes('Ana'), 'el nombre está');
 });

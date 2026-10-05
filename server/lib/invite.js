@@ -21,7 +21,9 @@ Pasos:
    "Listo. Ahora escribí estos dos comandos acá, de a uno (si pregunta algo, aceptá):
    /plugin marketplace add ${r}
    /plugin install sala@sala-equipo
-   Después cerrá y volvé a abrir Claude Code, y escribí /sala-abrir (la sala en el navegador) o /sala-mini (una franja en la terminal)."`;
+   Después cerrá y volvé a abrir Claude Code: arriba del prompt vas a ver la mini sala con el equipo caminando (se achica con ctrl+x ctrl+a).
+   Si no aparece, actualizá Claude Code con: claude update
+   Para la sala completa (jugar, mascota, personaje) escribí /sala-abrir: divide la pantalla, Claude a la izquierda y la sala a la derecha."`;
 }
 
 function messagesFile({ members, url, repo }) {

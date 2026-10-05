@@ -85,5 +85,5 @@ test('al sacar a alguien del equipo, su mensaje (con su token) desaparece del ar
 test('el mensaje menciona las dos formas de ver la sala', () => {
   const m = inviteMessage({ name: 'Flor', token: 't', url: 'http://x:3000', repo: 'a/b' });
   assert.match(m, /\/sala-abrir/);
-  assert.match(m, /\/sala-mini/);
+  assert.match(m, /arriba del prompt/);
 });

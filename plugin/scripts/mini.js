@@ -13,7 +13,7 @@ const Sprites = require('./sprites.js');
 
 const EMOTES = ['👋', '🎉', '☕', '🔥', '😂', '👍', '🤯', '🍕'];
 // Tamaños ya dibujados (con contorno). Grande: personaje 18x26, mascota 18x14. Compacto: 10x14 y 10x8.
-const DIMS = { false: { aw: 18, ah: 26, pw: 18, ph: 14 }, true: { aw: 11, ah: 12, pw: 11, ph: 7 } };
+const DIMS = { false: { aw: 18, ah: 26, pw: 18, ph: 14 }, true: { aw: 12, ah: 14, pw: 10, ph: 6 } };
 const FLOOR = ['#c98a65', '#9c5a40'];
 
 // ================= colores =================
@@ -84,7 +84,8 @@ function shrinkRows(rows) {
   return out;
 }
 // Chico: en vez de promediar bloques de 2x2 (se pierden caras y gorros), se eligen filas y columnas del dibujo
-// original obligando a quedarse con las de los ojos, la boca y los pies. Cabeza 7 filas, cuerpo 3, 9 de ancho.
+// original obligando a quedarse con las de los ojos, la boca y los pies. Cabeza 10 filas, cuerpo 4, 12 de ancho,
+// sin contorno: sobre el fondo oscuro de la terminal casi no se ve y esos píxeles rinden más como detalle.
 function pick(n, from, to, must = []) {
   const out = Array.from({ length: n }, (_, i) => Math.round(from + (i * (to - from)) / Math.max(1, n - 1)));
   for (const m of must) {
@@ -97,36 +98,61 @@ function pick(n, from, to, must = []) {
 }
 const rowsWith = (rows, re) => rows.map((r, i) => (re.test(r) ? i : -1)).filter((i) => i >= 0);
 const sample = (rows, R, C) => R.map((r) => C.map((c) => rows[r][c] || '.').join(''));
-function chibiRows(rows, split = 13) {
+// `ref`: el cuadro quieto; las filas y columnas se eligen con él para que al parpadear o caminar la cara no salte
+function chibiRows(rows, ref = rows, split = 13) {
+  const src = rows;
+  rows = ref;
   const top = Math.max(0, rows.findIndex((r) => /[^.]/.test(r)));
   const head = rows.slice(0, split);
   const eye = rowsWith(head, /E/)[0], mouth = rowsWith(head, /m/)[0];
-  const R = [...pick(7, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(3, split, rows.length - 1, [split, rows.length - 1])];
+  const R = [...pick(10, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(4, split, rows.length - 1, [split, rows.length - 1])];
   const ecols = eye === undefined ? [] : [...rows[eye]].map((c, i) => (c === 'E' ? i : -1)).filter((i) => i >= 0);
   const filled = rows.filter((r) => /[^.]/.test(r));
   const left = Math.min(...filled.map((r) => r.search(/[^.]/)));
   const right = Math.max(...filled.map((r) => r.length - 1 - [...r].reverse().join('').search(/[^.]/)));
-  return sample(rows, R, pick(9, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
+  return sample(src, R, pick(12, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
 }
+// Mascotas chicas dibujadas a mano: achicando el dibujo grande, las patas y orejas de 1-2 px quedaban como rayas.
+// Misma paleta que las grandes; mirando a la izquierda como ellas. 'paso' mueve las patas.
+const TINY_PETS = {
+  perrito: {
+    quieto: ['.dd......S', 'dSES....S.', 'NSSSSSSSS.', '.TLLSSSSS.', '..SS..SS..', '..dd..dd..'],
+    paso: ['.dd......S', 'dSES....S.', 'NSSSSSSSS.', '.TLLSSSSS.', '.SS....SS.', '.dd....dd.'],
+  },
+  gatito: {
+    quieto: ['.S.S......', '.SSS.....S', 'SESS....S.', '.WWSSSSSS.', '..SsSsSS..', '..ss..ss..'],
+    paso: ['.S.S......', '.SSS.....S', 'SESS....S.', '.WWSSSSSS.', '.SSsSsSSS.', '.ss....ss.'],
+  },
+  pollito: {
+    quieto: ['...YY...', '..YYYY..', '.oEYYYY.', '..YYyyYY', '...YyyY.', '...o.o..'],
+    paso: ['...YY...', '..YYYY..', '.oEYYYY.', '..YYyyYY', '...YyyY.', '..o...o.'],
+  },
+  slime: {
+    quieto: ['..........', '...GGGG...', '.GWGGGGGG.', '.GEGGGEGG.', 'GGGGGGGGGG', '.gggggggg.'],
+    paso: ['...GGGG...', '..GWGGGG..', '.GEGGGEGG.', '.GGGGGGGG.', 'GGGGGGGGGG', '.gggggggg.'],
+  },
+};
 function petChibiRows(rows) {
   const eye = rowsWith(rows, /E/)[0];
   const top = Math.max(0, rows.findIndex((r) => /[^.]/.test(r)));
   const ecol = eye === undefined ? -1 : rows[eye].indexOf('E');
   return sample(rows, pick(5, top, rows.length - 1, [eye, rows.length - 1].filter((x) => x !== undefined)), pick(9, 0, rows[0].length - 1, ecol >= 0 ? [ecol] : []));
 }
+const unpad = (grid) => grid.slice(1, -1).map((r) => r.slice(1, -1)); // sin contorno, el margen de 1 px sobra
 // Grande: mismo motor que la sala del navegador (luz, sombra y contorno de color). Compacto: plano con contorno.
 const cache = new Map();
 function cached(key, make) { if (!cache.has(key)) { if (cache.size > 300) cache.clear(); cache.set(key, make()); } return cache.get(key); }
 function avatarColors(u, frame, compact) {
   return cached(`a|${JSON.stringify([u.avatar, u.custom])}|${frame}|${compact}`, () => {
     const g = Sprites.spriteGrid(u, frame);
-    return Sprites.renderGrid(compact ? chibiRows(g.rows) : g.rows, g.palette, { light: true });
+    return compact ? unpad(Sprites.renderGrid(chibiRows(g.rows, Sprites.spriteGrid(u, 'quieto').rows), g.palette, { light: true, outline: null })) : Sprites.renderGrid(g.rows, g.palette, { light: true });
   });
 }
 function petColors(kind, frame, compact) {
   return cached(`p|${kind}|${frame}|${compact}`, () => {
     const rows = Sprites.petRows(kind, frame);
-    return Sprites.renderGrid(compact ? petChibiRows(rows) : rows, Sprites.petPal(kind), { light: true });
+    const tiny = compact && TINY_PETS[kind] && TINY_PETS[kind][frame === 'paso' ? 'paso' : 'quieto'];
+    return compact ? unpad(Sprites.renderGrid(tiny || petChibiRows(rows), Sprites.petPal(kind), { light: true, outline: null })) : Sprites.renderGrid(rows, Sprites.petPal(kind), { light: true });
   });
 }
 const hashName = (n) => [...n].reduce((h, c) => (h * 31 + c.codePointAt(0)) >>> 0, 0);
@@ -185,16 +211,16 @@ function buildFrame(model) {
   const lines = [];
   if (cols < 44) return ['La mini sala necesita una terminal un poco más ancha.'];
   const { aw, ah, pw, ph } = DIMS[!!compact];
-  const pixH = ah + 2; // personaje + piso
+  const floorPx = model.franja ? 0 : 2; // la franja de Claude Code no tiene piso: lo menos invasiva posible
+  const pixH = ah + floorPx;
   const canvas = Array.from({ length: pixH }, () => Array(cols).fill(null));
 
   // piso
-  for (let x = 0; x < cols; x++) { canvas[pixH - 2][x] = FLOOR[0]; canvas[pixH - 1][x] = FLOOR[1]; }
+  if (floorPx) for (let x = 0; x < cols; x++) { canvas[pixH - 2][x] = FLOOR[0]; canvas[pixH - 1][x] = FLOOR[1]; }
 
   const tags = textRow(cols), bubbles = textRow(cols);
-  // franja de Claude Code: sin filas de texto; los nombres (o la burbuja) van escritos sobre el piso
-  const FLOOR_ST = '38;2;58;34;24;48;2;201;138;101', ME_ST = '1;38;2;255;255;255;48;2;156;90;64';
-  const floor = Array.from({ length: cols }, () => ({ ch: ' ', st: FLOOR_ST }));
+  // franja de Claude Code: sin filas de texto; el nombre (o la burbuja) va tenue al costado de la cabeza
+  const names = textRow(cols);
   const ents = [...model.ents].sort((a, b) => (a.name === model.me) - (b.name === model.me)); // vos adelante
   for (const e of ents) {
     const u = model.users.find((x) => x.name === e.name);
@@ -205,25 +231,28 @@ function buildFrame(model) {
       : (now + hashName(u.name) * 97) % 4600 < 160 ? 'parpadeo' : 'quieto';
     let grid = avatarColors(u, frame, compact);
     if (e.facing < 0) grid = mirror(grid);
-    blit(canvas, grid, x, pixH - 2 - grid.length);
+    blit(canvas, grid, x, pixH - floorPx - grid.length);
     // mascota detrás, mirando hacia donde caminan
     if (u.pet && Sprites.PETS[u.pet.kind]) {
       let pg = petColors(u.pet.kind, e.moving && e.step % 4 >= 2 ? 'paso' : 'quieto', compact);
       if (e.facing > 0) pg = mirror(pg);
       const px = e.facing > 0 ? x - pw - 1 : x + aw + 1;
       const hop = e.petHopUntil > now && Math.floor(now / 150) % 2 ? (compact ? 1 : 2) : 0;
-      blit(canvas, pg, px, pixH - 2 - pg.length - hop);
+      blit(canvas, pg, px, pixH - floorPx - pg.length - hop);
     }
     // nombre arriba
     const tag = fitText(plain(u.name) || '?', 14);
     const tx = x + Math.floor(aw / 2) - Math.floor(textWidth(tag) / 2);
-    if (model.franja) put(floor, tx, tag, u.name === model.me ? ME_ST : FLOOR_ST);
+    // del lado contrario a la mascota, donde no hay nada dibujado a la altura de la cabeza
+    const side = (t) => (e.facing > 0 ? x + aw : x - textWidth(t));
+    if (model.franja) put(names, side(tag), tag, u.name === model.me ? '38;5;117' : '38;5;244');
     else put(tags, tx, tag, u.name === model.me ? '1;30;48;5;75' : '1;97;48;5;236');
     // burbuja
     const b = model.bubbles[u.name];
     if (b && b.until > now) {
       const txt = b.emote ? b.text : ` ${fitText(b.text, 28)} `;
-      put(model.franja ? floor : bubbles, x + Math.floor(aw / 2) - Math.floor(textWidth(txt) / 2), txt, b.emote ? (model.franja ? FLOOR_ST : '') : '30;107');
+      if (model.franja) put(names, side(txt.trim()), txt.trim(), '97');
+      else put(bubbles, x + Math.floor(aw / 2) - Math.floor(textWidth(txt) / 2), txt, b.emote ? '' : '30;107');
     }
   }
 
@@ -256,7 +285,18 @@ function buildFrame(model) {
   if (!model.franja) { lines.push(rowToString(status)); lines.push(rowToString(bubbles)); lines.push(rowToString(tags)); }
 
   // ----- píxeles: 2 por carácter -----
+  if (model.franja && !model.connected) put(names, cols - 15, ' sin conexión… ', '1;97;48;5;160');
   for (let r = 0; r < pixH; r += 2) {
+    if (model.franja && r === 0) { // fila de arriba: píxeles y, donde no hay, el nombre
+      const row = textRow(cols);
+      for (let x = 0; x < cols; x++) {
+        const top = canvas[0][x], bot = canvas[1][x];
+        if (names[x].st || names[x].ch === '') row[x] = names[x];
+        else if (top || bot) row[x] = top && bot ? { ch: '▀', st: `${fgCode(top, tc)};${bgCode(bot, tc)}` } : top ? { ch: '▀', st: `${fgCode(top, tc)};49` } : { ch: '▄', st: `${fgCode(bot, tc)};49` };
+      }
+      lines.push(rowToString(row));
+      continue;
+    }
     let out = '', cur = '';
     for (let x = 0; x < cols; x++) {
       const top = canvas[r][x], bot = (canvas[r + 1] || [])[x];
@@ -272,11 +312,7 @@ function buildFrame(model) {
   }
 
   // ----- pie: teclas o el mensaje que estás escribiendo -----
-  if (model.franja) {
-    if (!model.connected) put(floor, cols - 16, ' sin conexión… ', '1;97;48;5;160');
-    lines[lines.length - 1] = rowToString(floor); // 7 filas: personajes y el piso con los nombres
-    return lines;
-  }
+  if (model.franja) return lines; // 7 filas: solo los personajes
   const foot = textRow(cols);
   if (model.input !== null && model.input !== undefined) {
     put(foot, 0, fitText(` Mensaje: ${model.input}▏  (Enter manda · Esc cancela)`, cols), '97;48;5;238');
@@ -549,4 +585,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { chibiRows, petChibiRows, buildFrame, frameToCells, syncEntities, stepWorld, shrink, shrinkRows, mirror, rgbTo256, textWidth, fitText, charWidth, avatarColors };
+module.exports = { TINY_PETS, chibiRows, petChibiRows, buildFrame, frameToCells, syncEntities, stepWorld, shrink, shrinkRows, mirror, rgbTo256, textWidth, fitText, charWidth, avatarColors };
