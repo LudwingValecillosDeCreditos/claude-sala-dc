@@ -114,7 +114,7 @@ describe('Mini sala: dibujo', () => {
       const m = model({ compact, cols, bubbles: { Flor: { text: '👋', emote: true, until: Date.now() + 9e3 }, Ludwing: { text: 'hola ☕ equipo', until: Date.now() + 9e3 } } });
       M.syncEntities(m, Math.random);
       const lines = M.buildFrame(m);
-      assert.equal(lines.length, compact ? 12 : 18);
+      assert.equal(lines.length, compact ? 10 : 18);
       for (const l of lines) assert.equal(M.textWidth(strip(l)), cols, `${compact ? 'chico' : 'grande'} ${cols}: ${JSON.stringify(strip(l)).slice(0, 60)}`);
     }
   });
@@ -217,7 +217,7 @@ test('si estás en modo invisible, la mini te lo recuerda', () => {
   assert.match(M.buildFrame(m).map(strip)[0], /Estás invisible/);
 });
 
-test('franja de Claude Code: 7 filas, sin piso, mascotas chicas bien dibujadas y la cara quieta al parpadear', () => {
+test('franja de Claude Code: 5 filas, sin piso, mascotas chicas bien dibujadas y la cara quieta al parpadear', () => {
   const Sprites = require('../../plugin/scripts/sprites.js');
   for (const [kind, frames] of Object.entries(M.TINY_PETS)) {
     assert.ok(Sprites.PETS[kind], kind);
@@ -234,6 +234,6 @@ test('franja de Claude Code: 7 filas, sin piso, mascotas chicas bien dibujadas y
     users: [{ name: 'Ana', web: true, claude: 'working', avatar: u.avatar, pet: { kind: 'perrito' } }] };
   M.syncEntities(m);
   const lines = M.buildFrame(m);
-  assert.equal(lines.length, 7);
-  assert.ok(lines.map(strip).join('').includes('Ana'), 'el nombre está');
+  assert.equal(lines.length, 5);
+  assert.ok(lines.map(strip).join('').includes(M.tiny('Ana')), 'el nombre está, con letras chicas');
 });
