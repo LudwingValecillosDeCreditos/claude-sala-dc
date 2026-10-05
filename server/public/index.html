@@ -517,8 +517,11 @@ main.app { flex: 1; min-height: 0; }
 
 .av.here .sprite svg { animation: idle 1.6s steps(2) infinite; }
 .av.here .pet svg { animation: hop 1.8s steps(1) infinite; }
-.av.here.walking .sprite svg { animation: walk .32s steps(2) infinite; }
-.av.here.walking .pet svg { animation: walk .32s steps(2) infinite reverse; }
+/* al caminar: alternar los cuadros de paso Y rebotar; si solo rebota, los cuadros de paso quedan ocultos y el muñeco desaparece */
+.av.here.walking .frames > .f-w1 { animation: fwa .36s steps(1) infinite, walk .32s steps(2) infinite; }
+.av.here.walking .frames > .f-w2 { animation: fwb .36s steps(1) infinite, walk .32s steps(2) infinite; }
+.av.here.walking .petsvg > .f-q { animation: fwa .36s steps(1) infinite, walk .32s steps(2) infinite reverse; }
+.av.here.walking .petsvg > .f-w { animation: fwb .36s steps(1) infinite, walk .32s steps(2) infinite reverse; }
 .robot .burst { bottom: 100%; }
 </style>
 </head>

@@ -1,6 +1,9 @@
 {
   "name": "sala",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Reporta tu estado (trabajando, esperando, libre) a La Sala del equipo. Solo envía el estado y el nombre de la herramienta, nunca prompts ni código.",
-  "author": { "name": "Ludwing" }
+  "author": {
+    "name": "Ludwing"
+  },
+  "types": "./types/index.d.ts"
 }

@@ -558,6 +558,11 @@ function createSala(opts = {}) {
       if (!name) return reply(res, 401, JSON.stringify({ ok: false, error: 'token inválido' }), 'application/json');
       return reply(res, 200, JSON.stringify({ ok: true, name, version: VERSION, time: now(), ip: net.normalizeIp(req.socket.remoteAddress) }), 'application/json');
     }
+    // la franja de Claude Code pregunta cada pocos segundos (no puede quedarse escuchando /api/stream)
+    if (req.method === 'GET' && url.pathname === '/api/estado') {
+      if (!nameForToken(url.searchParams.get('t'))) return json(res, 401, { ok: false, errors: ['token inválido'] });
+      return json(res, 200, snapshot());
+    }
     if (req.method === 'GET' && url.pathname === '/unirse') {
       const t = url.searchParams.get('t');
       const name = nameForToken(t);

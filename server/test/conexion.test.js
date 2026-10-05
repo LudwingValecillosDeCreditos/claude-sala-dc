@@ -18,6 +18,15 @@ describe('Conexión de las computadoras y los Claude', () => {
     assert.deepEqual([p.ok, p.name, p.version, p.ip], [true, 'Emi', '0.8.1', '127.0.0.1']);
   });
 
+  test('/api/estado da la foto de la sala para la franja de Claude Code', async () => {
+    assert.equal((await fetch(`${s.url}/api/estado?t=inventado`)).status, 401);
+    await machine(s.url, s.tokens.Flor).hook('start', { session_id: 'franja' });
+    const e = await (await fetch(`${s.url}/api/estado?t=${s.tokens.Emi}`)).json();
+    assert.equal(e.type, 'state');
+    assert.deepEqual(e.team, ['Ludwing', 'Flor', 'Emi']);
+    assert.ok(e.users.some((u) => u.name === 'Flor' && u.claude !== 'off'));
+  });
+
   test('la sala sirve sus propias fuentes (anda sin internet) y no deja leer otros archivos', async () => {
     const f = await fetch(s.url + '/fonts/press-start-2p-latin-400-normal.woff2');
     assert.equal(f.status, 200);
