@@ -13,7 +13,7 @@ const SALA = {
 
 // Debajo del plugin: la carpeta de usuario, ~/.claude-sala.json y el servidor.
 function pc(on: On, { config = true, server = true } = {}) {
-  mock.clock(on)
+  const clock = mock.clock(on)
   mock.env(on, { USERPROFILE: 'C:/Users/x' })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('ui.render', ($, e) => { const { Box } = $.ui.resolve(e); return <Box /> }) // el motor: franja vacía
@@ -26,6 +26,7 @@ function pc(on: On, { config = true, server = true } = {}) {
     expect(e.url).toBe('http://10.0.0.1:3000/api/estado?t=tok')
     return { value: { status: 200, ok: true, headers: {}, text: JSON.stringify(SALA) } }
   })
+  return clock
 }
 
 test('la franja muestra al equipo y se oculta con el botón', async ($, on) => {
@@ -53,3 +54,26 @@ for (const [caso, opts] of [['sala apagada', { server: false }], ['sin configura
     await ui.unmount()
   })
 }
+
+test('en la terminal dibuja la mini sala animada con los cuadros de mini.js', async ($, on) => {
+  const clock = pc(on)
+  const pedidos: string[][] = []
+  on('process.spawn', async function* (_$, e) {
+    pedidos.push([...e.argv])
+    const cols = Number(e.argv[e.argv.length - 1])
+    const cells = btoa(String.fromCharCode(...new Uint8Array(new Uint32Array(cols * 2 * 3).fill(0x41).buffer)))
+    yield { stream: 'stdout', text: JSON.stringify({ rows: 2, cols, cells }) + '\n' }
+    await new Promise(() => {}) // mini.js sigue corriendo
+    return { value: { code: 0, signal: null } }
+  })
+  await $.session.start({ cwd: '.', surface: 'terminal' } as never)
+  const props = { ...BAND.props, bodyColumns: 80, maxRows: 20 }
+  let ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', component: 'AbovePrompt', props })
+  await clock.advance(1000)
+  await ui.unmount()
+  expect(pedidos[0]?.slice(-2)).toEqual(['--celdas', '80'])
+  expect(pedidos[0]?.[1]).toContain('mini.js')
+  ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', component: 'AbovePrompt', props })
+  expect(await ui.find({ key: 'mini' })).toBeDefined()
+  await ui.unmount()
+})

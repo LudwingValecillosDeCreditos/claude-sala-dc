@@ -239,6 +239,7 @@ function buildFrame(model) {
   }
 
   // ----- pie: teclas o el mensaje que estás escribiendo -----
+  if (model.noFoot) return lines;
   const foot = textRow(cols);
   if (model.input !== null && model.input !== undefined) {
     put(foot, 0, fitText(` Mensaje: ${model.input}▏  (Enter manda · Esc cancela)`, cols), '97;48;5;238');
@@ -247,6 +248,53 @@ function buildFrame(model) {
   }
   lines.push(rowToString(foot));
   return lines;
+}
+
+// ================= celdas para la franja de Claude Code =================
+// La franja dibuja un Raster: por celda [carácter, color de letra, color de fondo] en u32, en base64.
+// Convierte las líneas ANSI de buildFrame (así la franja y la terminal muestran exactamente lo mismo).
+const DEFAULT = 0x01000000;
+const BASIC = [0x000000, 0xcd0000, 0x00cd00, 0xcdcd00, 0x0000ee, 0xcd00cd, 0x00cdcd, 0xe5e5e5, 0x7f7f7f, 0xff0000, 0x00ff00, 0xffff00, 0x5c5cff, 0xff00ff, 0x00ffff, 0xffffff];
+function xterm256(n) {
+  if (n < 16) return BASIC[n];
+  if (n >= 232) { const v = 8 + (n - 232) * 10; return (v << 16) | (v << 8) | v; }
+  const st = [0, 95, 135, 175, 215, 255], i = n - 16;
+  return (st[Math.floor(i / 36)] << 16) | (st[Math.floor(i / 6) % 6] << 8) | st[i % 6];
+}
+// El Raster solo acepta caracteres de una columna: los emojis pasan a un símbolo parecido.
+const EMOJI_GLYPH = { '💖': '♥', '⭐': '★', '✨': '✦', '👍': '+', '🔥': '▲', '☕': 'c', '🍕': '◭', '🎉': '*', '👋': 'o' };
+function frameToCells(lines, cols) {
+  const words = new Uint32Array(lines.length * cols * 3);
+  lines.forEach((line, r) => {
+    let fg = DEFAULT, bg = DEFAULT, c = 0, i = 0;
+    const cell = (ch) => { if (c >= cols) return; const k = (r * cols + c++) * 3; words[k] = ch.codePointAt(0); words[k + 1] = fg; words[k + 2] = bg; };
+    while (i < line.length) {
+      if (line[i] === '\x1b') {
+        const end = line.indexOf('m', i);
+        const p = line.slice(i + 2, end).split(';').map(Number);
+        for (let j = 0; j < p.length; j++) {
+          const v = p[j];
+          if (v === 0) { fg = DEFAULT; bg = DEFAULT; }
+          else if ((v === 38 || v === 48) && p[j + 1] === 2) { const rgb = (p[j + 2] << 16) | (p[j + 3] << 8) | p[j + 4]; if (v === 38) fg = rgb; else bg = rgb; j += 4; }
+          else if ((v === 38 || v === 48) && p[j + 1] === 5) { const rgb = xterm256(p[j + 2]); if (v === 38) fg = rgb; else bg = rgb; j += 2; }
+          else if (v >= 30 && v <= 37) fg = BASIC[v - 30];
+          else if (v >= 90 && v <= 97) fg = BASIC[v - 82];
+          else if (v === 39) fg = DEFAULT;
+          else if (v === 49) bg = DEFAULT;
+        }
+        i = end + 1;
+        continue;
+      }
+      const ch = String.fromCodePoint(line.codePointAt(i));
+      i += ch.length;
+      const w = charWidth(ch);
+      if (w === 0) continue;
+      if (w === 2 || ch.codePointAt(0) > 0xffff) { cell(EMOJI_GLYPH[ch] || '◆'); if (w === 2) cell(' '); }
+      else cell(ch);
+    }
+    while (c < cols) cell(' ');
+  });
+  return Buffer.from(words.buffer).toString('base64');
 }
 
 // ================= mundo: quién camina por dónde =================
@@ -359,16 +407,20 @@ function main() {
     console.log('La mini sala no está configurada. En Claude Code corré /sala-setup (o pegá el mensaje de invitación).');
     process.exit(1);
   }
-  if (!process.stdout.isTTY) { console.log('La mini sala tiene que correr en una terminal.'); process.exit(1); }
+  // --celdas <ancho>: sin terminal; escribe cada cuadro como JSON {rows, cells} para la franja de Claude Code
+  const ci = process.argv.indexOf('--celdas');
+  const CELDAS = ci >= 0;
+  if (!CELDAS && !process.stdout.isTTY) { console.log('La mini sala tiene que correr en una terminal.'); process.exit(1); }
 
   const model = {
-    cols: process.stdout.columns || 100, compact: !process.argv.includes('--grande'),
-    truecolor: supportsTruecolor(), me: null, meInfo: null, users: [], ents: [], bubbles: {}, flash: null,
+    cols: CELDAS ? Math.max(44, Math.min(512, Number(process.argv[ci + 1]) || 100)) : process.stdout.columns || 100,
+    compact: !process.argv.includes('--grande'), noFoot: CELDAS,
+    truecolor: CELDAS || supportsTruecolor(), me: null, meInfo: null, users: [], ents: [], bubbles: {}, flash: null,
     doneUntil: 0, now: Date.now(), input: null, connected: false,
   };
   const flash = (text, ms = 3500) => { model.flash = { text, until: Date.now() + ms }; };
   const bubble = (name, text, emote, ms) => { model.bubbles[name] = { text, emote, until: Date.now() + (ms || (emote ? 2500 : 5000)) }; };
-  const bell = () => process.stdout.write('\x07');
+  const bell = () => { if (!CELDAS) process.stdout.write('\x07'); };
 
   const stop = openStream(cfg, (m) => {
     switch (m.type) {
@@ -391,6 +443,18 @@ function main() {
       default: break;
     }
   }, (ok, why) => { model.connected = ok; if (why) flash(why, 6000); });
+
+  if (CELDAS) {
+    let last = '';
+    process.stdout.on('error', () => process.exit(0)); // la franja se cerró
+    setInterval(() => {
+      model.now = Date.now(); stepWorld(model);
+      const lines = buildFrame(model);
+      const cells = frameToCells(lines, model.cols);
+      if (cells !== last) { last = cells; process.stdout.write(JSON.stringify({ rows: lines.length, cols: model.cols, cells }) + '\n'); }
+    }, 125);
+    return;
+  }
 
   const out = process.stdout;
   out.write('\x1b[?1049h\x1b[?25l');
@@ -448,4 +512,4 @@ function main() {
 }
 
 if (require.main === module) main();
-module.exports = { buildFrame, syncEntities, stepWorld, shrink, shrinkRows, mirror, rgbTo256, textWidth, fitText, charWidth, avatarColors };
+module.exports = { buildFrame, frameToCells, syncEntities, stepWorld, shrink, shrinkRows, mirror, rgbTo256, textWidth, fitText, charWidth, avatarColors };
