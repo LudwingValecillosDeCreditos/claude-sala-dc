@@ -21,9 +21,10 @@ Pasos:
    "Listo. Ahora escribí estos dos comandos acá, de a uno (si pregunta algo, aceptá):
    /plugin marketplace add ${r}
    /plugin install sala@sala-equipo
-   Después cerrá y volvé a abrir Claude Code: arriba del prompt vas a ver la mini sala con el equipo caminando (/sala-franja chica, mediana o grande cambia el tamaño).
+   Después cerrá y volvé a abrir Claude Code: arriba del prompt vas a ver la barra de La Sala con quién está (🤖 con Claude, 💤 libre, ☕ ausente) y el botón \"Entrar a la sala\".
+   Si querés ver al equipo caminando ahí mismo: /sala-franja mediana (o chica, o grande).
    Si no aparece, actualizá Claude Code con: claude update
-   Para la sala completa (jugar, mascota, personaje) escribí /sala-abrir: divide la pantalla, Claude a la izquierda y la sala a la derecha."`;
+   \"Entrar a la sala\" (o /sala-abrir) divide la pantalla: Claude a la izquierda y la sala completa a la derecha, para jugar, cuidar tu mascota y armar tu personaje."`;
 }
 
 function messagesFile({ members, url, repo }) {

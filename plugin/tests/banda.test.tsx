@@ -12,7 +12,7 @@ const SALA = {
 }
 
 // Debajo del plugin: la carpeta de usuario, ~/.claude-sala.json y el servidor.
-function pc(on: On, { config = true, server = true, franja = 'grande' } = {}) {
+function pc(on: On, { config = true, server = true, franja = undefined as string | undefined } = {}) {
   const clock = mock.clock(on)
   mock.env(on, { USERPROFILE: 'C:/Users/x' })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
@@ -29,17 +29,26 @@ function pc(on: On, { config = true, server = true, franja = 'grande' } = {}) {
   return clock
 }
 
-test('la franja muestra al equipo y se oculta con el botón', async ($, on) => {
+test('por defecto es una barra de una línea: quién está, Entrar abre la sala y Ocultar la esconde', async ($, on) => {
   pc(on)
+  const corridos: string[][] = []
+  on('process.run', (_$, e) => {
+    corridos.push([...e.argv])
+    return { value: { exitCode: 0, stdout: 'Listo: Claude Code a la izquierda y La Sala a la derecha.\n', stderr: '' } }
+  })
+  on('ui.toast', () => ({ value: undefined }))
   await $.session.start({ cwd: '.', surface: 'terminal' } as never)
   for (const surface of ['terminal', 'desktop'] as const) {
     const ui = await $.ui.mount({ plugin: 'sala', surface, ...BAND })
     expect(await ui.find({ type: 'Text', text: /🤖 Micaela/ })).toBeDefined()
     expect(await ui.find({ type: 'Text', text: /☕ Axel/ })).toBeDefined()
-    expect(await ui.find({ type: 'Text', text: /2\/3/ })).toBeDefined()
+    expect(await ui.find({ key: 'entrar' })).toBeDefined()
     await ui.unmount()
   }
   const ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', ...BAND })
+  await ui.press({ key: 'entrar' })
+  expect(corridos[0]?.[0]).toBe('node')
+  expect(corridos[0]?.[1]).toContain('abrir.js')
   await ui.press({ key: 'ocultar' })
   expect(await ui.find({ type: 'Text', text: /Micaela/ })).toBeUndefined()
   await ui.unmount()
@@ -56,7 +65,7 @@ for (const [caso, opts] of [['sala apagada', { server: false }], ['sin configura
 }
 
 test('en la terminal dibuja la mini sala animada con los cuadros de mini.js', async ($, on) => {
-  const clock = pc(on)
+  const clock = pc(on, { franja: 'grande' })
   const pedidos: string[][] = []
   on('process.spawn', async function* (_$, e) {
     pedidos.push([...e.argv])
