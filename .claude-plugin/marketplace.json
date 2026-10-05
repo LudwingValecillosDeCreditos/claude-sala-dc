@@ -1,0 +1,12 @@
+{
+  "name": "sala-equipo",
+  "owner": { "name": "Ludwing" },
+  "plugins": [
+    {
+      "name": "sala",
+      "source": "./plugin",
+      "description": "Muestra en La Sala del equipo si estás trabajando con Claude o libre, con tu personaje.",
+      "version": "0.6.1"
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+node_modules/
+server/team.json
+server/data.json
+server/sala.config.json
+server/mensajes-para-el-equipo.txt

@@ -1,0 +1,22 @@
+{
+  "name": "la-sala-server",
+  "version": "0.8.1",
+  "private": true,
+  "description": "Servidor LAN de La Sala para el plugin de Claude Code",
+  "main": "server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node server.js",
+    "sumar": "node equipo.js",
+    "equipo": "node equipo.js --lista",
+    "quitar": "node equipo.js --quitar",
+    "diagnostico": "node diagnostico.js",
+    "test": "node --test --test-concurrency=1",
+    "iniciar": "node iniciar.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
