@@ -112,9 +112,14 @@ export const register: Register = on => {
           label="Entrar a la sala"
           onPress={async () => {
             $.ui.toast('Abriendo La Sala…')
-            const r = await $.process.run(['node', `${$.plugin.root}/scripts/abrir.js`])
-            const linea = r.stdout.trim().split('\n').pop()
-            if (linea) $.ui.toast(linea)
+            try {
+              const r = await $.process.run(['node', `${$.plugin.root}/scripts/abrir.js`])
+              const linea = r.stdout.trim().split('\n').pop()
+              if (linea) $.ui.toast(linea)
+            } catch {
+              // donde no se pueden correr programas (según la app), el comando lo hace Claude
+              $.ui.toast('Escribí /sala-abrir para entrar a la sala')
+            }
           }}
         />
         <Text> </Text>

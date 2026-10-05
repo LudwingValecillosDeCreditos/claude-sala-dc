@@ -95,3 +95,15 @@ test('con /sala-franja apagada no dibuja nada', async ($, on) => {
   expect(await ui.find({ type: 'Text', text: /La Sala/ })).toBeUndefined()
   await ui.unmount()
 })
+
+test('si la app no deja correr programas, Entrar avisa que se use /sala-abrir', async ($, on) => {
+  pc(on)
+  const avisos: string[] = []
+  on('process.run', () => { throw new Error('no disponible') })
+  on('ui.toast', (_$, e) => { avisos.push(String((e as { text?: string }).text ?? JSON.stringify(e))); return { value: undefined } })
+  await $.session.start({ cwd: '.', surface: 'desktop' } as never)
+  const ui = await $.ui.mount({ plugin: 'sala', surface: 'desktop', ...BAND })
+  await ui.press({ key: 'entrar' })
+  expect(avisos.join(' ')).toContain('/sala-abrir')
+  await ui.unmount()
+})
