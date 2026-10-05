@@ -48,4 +48,29 @@ function interfaces() {
   return out.sort((a, b) => Number(b.vpn) - Number(a.vpn));
 }
 
-module.exports = { parseAllowList, normalizeIp, interfaces, ipToInt };
+// Windows: ¿hay una regla del Firewall que deje entrar a la sala (la de La Sala por nombre, o una para este node.exe)?
+// true / false; null si no se pudo averiguar (otro sistema, o PowerShell no respondió).
+// Con la red de la VPN como "Pública", sin regla Windows corta las conexiones de los demás en silencio.
+// (Las reglas por puerto no se pueden leer sin ser administrador: por eso se busca la nuestra por nombre.)
+const nombreRegla = (port, vpn) => `La Sala (puerto ${port}${vpn ? ', solo VPN' : ''})`;
+function firewallAbierto(port, exe = process.execPath) {
+  if (process.platform !== 'win32') return null;
+  const ps = `
+# el node que está escuchando en el puerto (la sala); si no hay ninguno, el que corre este chequeo
+$escucha = Get-NetTCPConnection -LocalPort $env:SALA_P -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($escucha) { $p = (Get-Process -Id $escucha.OwningProcess -ErrorAction SilentlyContinue).Path; if ($p) { $env:SALA_E = $p } }
+$f = @(Get-NetFirewallApplicationFilter -ErrorAction SilentlyContinue | Where-Object { $_.Program -and ([Environment]::ExpandEnvironmentVariables($_.Program)) -ieq $env:SALA_E })
+$porNode = $f.Count -and @($f | Get-NetFirewallRule | Where-Object { $_.Enabled -eq 'True' -and $_.Direction -eq 'Inbound' -and $_.Action -eq 'Allow' }).Count
+$porNombre = @(Get-NetFirewallRule -DisplayName $env:SALA_N1, $env:SALA_N2 -ErrorAction SilentlyContinue | Where-Object { $_.Enabled -eq 'True' -and $_.Action -eq 'Allow' }).Count
+if ($porNode -or $porNombre) { 'si' } else { 'no' }`;
+  const r = require('child_process').spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', ps], {
+    encoding: 'utf8', timeout: 20000, env: { ...process.env, SALA_P: String(port), SALA_E: exe, SALA_N1: nombreRegla(port, true), SALA_N2: nombreRegla(port, false) },
+  });
+  const out = (r.stdout || '').trim().split(/\r?\n/).pop();
+  return out === 'si' ? true : out === 'no' ? false : null;
+}
+// El comando que abre el puerto solo por la VPN (hay que correrlo como administrador)
+const comandoFirewall = (port, vpnName) =>
+  `New-NetFirewallRule -DisplayName "${nombreRegla(port, !!vpnName)}" -Direction Inbound -Protocol TCP -LocalPort ${port}${vpnName ? ` -InterfaceAlias "${vpnName}"` : ''} -Action Allow -Profile Any`;
+
+module.exports = { parseAllowList, normalizeIp, interfaces, ipToInt, firewallAbierto, comandoFirewall };

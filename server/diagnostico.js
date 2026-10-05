@@ -42,6 +42,14 @@ const bad = (t) => console.log('  ❌ ' + t);
     req.on('timeout', () => { req.destroy(); resolve(null); });
   });
   if (running === 200) ok(`El servidor responde en el puerto ${PORT}`);
+  const fw = net.firewallAbierto(PORT);
+  if (fw === true) ok(`El Firewall de Windows deja entrar al puerto ${PORT}`);
+  else if (fw === false) {
+    const vpn = ifs.find((i) => i.vpn);
+    bad(`El Firewall de Windows bloquea a los demás: no hay regla para el puerto ${PORT} ni para el Node que corre la sala.`);
+    console.log('     Abrí PowerShell como administrador y pegá:');
+    console.log('     ' + net.comandoFirewall(PORT, vpn && vpn.name));
+  }
   else if (running === 403) warn(`El servidor está andando pero la lista blanca no deja entrar a 127.0.0.1 (normal si no la agregaste)`);
   else warn(`El servidor no está corriendo en el puerto ${PORT}. Levantalo con: npm start`);
 

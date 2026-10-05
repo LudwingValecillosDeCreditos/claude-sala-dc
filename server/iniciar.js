@@ -90,7 +90,12 @@ async function main() {
     process.exit(1);
   });
   line(`  La sala está abierta en ${url} 🛋️`);
-  line('  Si Windows pregunta por el firewall, permití el acceso en redes privadas.');
+  if (net.firewallAbierto(port) === false) {
+    const vpn = net.interfaces().find((x) => x.vpn);
+    line('  ❌ El Firewall de Windows no deja entrar a los demás (tu PC sí ve la sala, ellos no).');
+    line('     Abrí PowerShell como administrador y pegá esto una sola vez:');
+    line('     ' + net.comandoFirewall(port, vpn && vpn.name));
+  }
   line('  Dejá esta ventana abierta mientras el equipo use la sala. Para cerrarla: Ctrl+C.\n');
   const stop = () => sala.close().then(() => process.exit(0));
   process.on('SIGINT', stop);
