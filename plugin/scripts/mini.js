@@ -13,7 +13,18 @@ const Sprites = require('./sprites.js');
 
 const EMOTES = ['👋', '🎉', '☕', '🔥', '😂', '👍', '🤯', '🍕'];
 // Tamaños ya dibujados (con contorno). Grande: personaje 18x26, mascota 18x14. Compacto: 10x14 y 10x8.
-const DIMS = { false: { aw: 18, ah: 26, pw: 18, ph: 14 }, true: { aw: 10, ah: 10, pw: 8, ph: 4 } };
+// Tamaños por modo. full: la mini sala grande de la terminal (con contorno). En la franja de Claude Code cada uno elige
+// (/sala-franja): chica 5 filas, mediana 7, grande 12 (el dibujo entero, como en la sala del navegador; sin mascota ni nombre).
+const DIMS = {
+  full: { aw: 18, ah: 26, pw: 18, ph: 14 },
+  chica: { aw: 10, ah: 10, pw: 8, ph: 4 },
+  mediana: { aw: 12, ah: 14, pw: 8, ph: 4 },
+  grande: { aw: 16, ah: 24, pw: 0, ph: 0 },
+};
+const CHIBI = { chica: { head: 8, body: 2, width: 10 }, mediana: { head: 10, body: 4, width: 12 } };
+const TAMS = ['chica', 'mediana', 'grande'];
+const modeOf = (model) => (model.franja ? (TAMS.includes(model.tam) ? model.tam : 'mediana') : model.compact ? 'chica' : 'full');
+const asMode = (m) => (m === true ? 'chica' : m === false ? 'full' : m);
 const FLOOR = ['#c98a65', '#9c5a40'];
 
 // ================= colores =================
@@ -99,18 +110,18 @@ function pick(n, from, to, must = []) {
 const rowsWith = (rows, re) => rows.map((r, i) => (re.test(r) ? i : -1)).filter((i) => i >= 0);
 const sample = (rows, R, C) => R.map((r) => C.map((c) => rows[r][c] || '.').join(''));
 // `ref`: el cuadro quieto; las filas y columnas se eligen con él para que al parpadear o caminar la cara no salte
-function chibiRows(rows, ref = rows, split = 13) {
+function chibiRows(rows, ref = rows, { head: nh, body: nb, width: nw } = CHIBI.chica, split = 13) {
   const src = rows;
   rows = ref;
   const top = Math.max(0, rows.findIndex((r) => /[^.]/.test(r)));
   const head = rows.slice(0, split);
   const eye = rowsWith(head, /E/)[0], mouth = rowsWith(head, /m/)[0];
-  const R = [...pick(8, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(2, split, rows.length - 1, [split, rows.length - 1])];
+  const R = [...pick(nh, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(nb, split, rows.length - 1, [split, rows.length - 1])];
   const ecols = eye === undefined ? [] : [...rows[eye]].map((c, i) => (c === 'E' ? i : -1)).filter((i) => i >= 0);
   const filled = rows.filter((r) => /[^.]/.test(r));
   const left = Math.min(...filled.map((r) => r.search(/[^.]/)));
   const right = Math.max(...filled.map((r) => r.length - 1 - [...r].reverse().join('').search(/[^.]/)));
-  return sample(src, R, pick(10, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
+  return sample(src, R, pick(nw, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
 }
 // Mascotas chicas dibujadas a mano: achicando el dibujo grande, las patas y orejas de 1-2 px quedaban como rayas.
 // Misma paleta que las grandes; mirando a la izquierda como ellas. 'paso' mueve las patas.
@@ -130,14 +141,19 @@ const unpad = (grid) => grid.slice(1, -1).map((r) => r.slice(1, -1)); // sin con
 // Grande: mismo motor que la sala del navegador (luz, sombra y contorno de color). Compacto: plano con contorno.
 const cache = new Map();
 function cached(key, make) { if (!cache.has(key)) { if (cache.size > 300) cache.clear(); cache.set(key, make()); } return cache.get(key); }
-function avatarColors(u, frame, compact) {
-  return cached(`a|${JSON.stringify([u.avatar, u.custom])}|${frame}|${compact}`, () => {
+function avatarColors(u, frame, mode) {
+  mode = asMode(mode);
+  return cached(`a|${JSON.stringify([u.avatar, u.custom])}|${frame}|${mode}`, () => {
     const g = Sprites.spriteGrid(u, frame);
-    return compact ? unpad(Sprites.renderGrid(chibiRows(g.rows, Sprites.spriteGrid(u, 'quieto').rows), g.palette, { light: true, outline: null })) : Sprites.renderGrid(g.rows, g.palette, { light: true });
+    if (mode === 'full') return Sprites.renderGrid(g.rows, g.palette, { light: true });
+    const rows = CHIBI[mode] ? chibiRows(g.rows, Sprites.spriteGrid(u, 'quieto').rows, CHIBI[mode]) : g.rows; // grande: el dibujo entero
+    return unpad(Sprites.renderGrid(rows, g.palette, { light: true, outline: null }));
   });
 }
-function petColors(kind, frame, compact) {
-  return cached(`p|${kind}|${frame}|${compact}`, () => {
+function petColors(kind, frame, mode) {
+  mode = asMode(mode);
+  const compact = mode !== 'full';
+  return cached(`p|${kind}|${frame}|${mode}`, () => {
     const rows = Sprites.petRows(kind, frame);
     const tiny = compact && TINY_PETS[kind] && TINY_PETS[kind][frame === 'paso' ? 'paso' : 'quieto'];
     return compact ? unpad(Sprites.renderGrid(tiny || petChibiRows(rows), Sprites.petPal(kind), { light: true, outline: null })) : Sprites.renderGrid(rows, Sprites.petPal(kind), { light: true });
@@ -201,7 +217,8 @@ function buildFrame(model) {
   const { cols, compact, truecolor: tc, now } = model;
   const lines = [];
   if (cols < 44) return ['La mini sala necesita una terminal un poco más ancha.'];
-  const { aw, ah, pw, ph } = DIMS[!!compact];
+  const mode = modeOf(model);
+  const { aw, ah, pw, ph } = DIMS[mode];
   const floorPx = model.franja ? 0 : 2; // la franja de Claude Code no tiene piso: lo menos invasiva posible
   const pixH = ah + floorPx;
   const canvas = Array.from({ length: pixH }, () => Array(cols).fill(null));
@@ -220,12 +237,12 @@ function buildFrame(model) {
     // cuadro: pasos al caminar, parpadeo de vez en cuando
     const frame = e.moving ? (e.step % 4 < 2 ? 'paso1' : 'paso2')
       : (now + hashName(u.name) * 97) % 4600 < 160 ? 'parpadeo' : 'quieto';
-    let grid = avatarColors(u, frame, compact);
+    let grid = avatarColors(u, frame, mode);
     if (e.facing < 0) grid = mirror(grid);
     blit(canvas, grid, x, pixH - floorPx - grid.length);
     // mascota detrás, mirando hacia donde caminan
-    if (u.pet && Sprites.PETS[u.pet.kind]) {
-      let pg = petColors(u.pet.kind, e.moving && e.step % 4 >= 2 ? 'paso' : 'quieto', compact);
+    if (u.pet && Sprites.PETS[u.pet.kind] && mode !== 'grande') {
+      let pg = petColors(u.pet.kind, e.moving && e.step % 4 >= 2 ? 'paso' : 'quieto', mode);
       if (e.facing > 0) pg = mirror(pg);
       const px = e.facing > 0 ? x - pw - 1 : x + aw + 1;
       const hop = e.petHopUntil > now && Math.floor(now / 150) % 2 ? (compact ? 1 : 2) : 0;
@@ -236,13 +253,13 @@ function buildFrame(model) {
     const tx = x + Math.floor(aw / 2) - Math.floor(textWidth(tag) / 2);
     // del lado contrario a la mascota, donde no hay nada dibujado a la altura de la cabeza
     const side = (t) => (e.facing > 0 ? x + aw : x - textWidth(t));
-    if (model.franja) put(names, side(tag), tag, u.name === model.me ? '38;5;117' : '38;5;244');
+    if (model.franja && mode !== 'grande') put(names, side(tag), tag, u.name === model.me ? '38;5;117' : '38;5;244');
     else put(tags, tx, tag, u.name === model.me ? '1;30;48;5;75' : '1;97;48;5;236');
     // burbuja
     const b = model.bubbles[u.name];
     if (b && b.until > now) {
       const txt = b.emote ? b.text : ` ${fitText(b.text, 28)} `;
-      if (model.franja) put(names, side(txt.trim()), txt.trim(), '97');
+      if (model.franja) put(names, side(txt.trim()), txt.trim(), '97'); // los mensajes sí se ven siempre
       else put(bubbles, x + Math.floor(aw / 2) - Math.floor(textWidth(txt) / 2), txt, b.emote ? '' : '30;107');
     }
   }
@@ -303,7 +320,7 @@ function buildFrame(model) {
   }
 
   // ----- pie: teclas o el mensaje que estás escribiendo -----
-  if (model.franja) return lines; // 5 filas: solo los personajes
+  if (model.franja) return lines; // solo los personajes: 5, 7 o 12 filas según el tamaño
   const foot = textRow(cols);
   if (model.input !== null && model.input !== undefined) {
     put(foot, 0, fitText(` Mensaje: ${model.input}▏  (Enter manda · Esc cancela)`, cols), '97;48;5;238');
@@ -365,7 +382,7 @@ function frameToCells(lines, cols) {
 // Busca un lugar donde no haya nadie parado ni yendo. Revisa todas las posiciones posibles y elige al azar
 // entre las libres; si no hay ninguna libre (mucha gente), la más alejada de todos.
 function freeSpot(model, self, rand, spread = false) {
-  const { aw, pw } = DIMS[!!model.compact];
+  const { aw, pw } = DIMS[modeOf(model)];
   const min = pw + 2, max = Math.max(min + 1, model.cols - aw - pw - 2);
   const gap = aw + pw + 4;
   const others = model.ents.filter((e) => e !== self).flatMap((e) => [e.x, e.target]);
@@ -393,7 +410,7 @@ function syncEntities(model, rand = Math.random) {
   }
 }
 function stepWorld(model, rand = Math.random) {
-  const { aw, pw } = DIMS[!!model.compact];
+  const { aw, pw } = DIMS[modeOf(model)];
   const min = pw + 2, max = Math.max(min + 1, model.cols - aw - pw - 2);
   for (const e of model.ents) {
     e.target = Math.max(min, Math.min(max, e.target));
@@ -479,6 +496,7 @@ function main() {
   const model = {
     cols: CELDAS ? Math.max(44, Math.min(512, Number(process.argv[ci + 1]) || 100)) : process.stdout.columns || 100,
     compact: !process.argv.includes('--grande'), franja: CELDAS,
+    tam: process.argv.includes('--tam') ? process.argv[process.argv.indexOf('--tam') + 1] : 'mediana',
     truecolor: CELDAS || supportsTruecolor(), me: null, meInfo: null, users: [], ents: [], bubbles: {}, flash: null,
     doneUntil: 0, now: Date.now(), input: null, connected: false,
   };

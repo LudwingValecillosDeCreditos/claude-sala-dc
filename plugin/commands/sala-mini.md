@@ -4,7 +4,7 @@ argument-hint: [grande]
 ---
 Argumento: $ARGUMENTS
 
-La mini sala ya aparece sola arriba del prompt de Claude Code, animada, en cualquier terminal (es la franja de La Sala; se achica con ctrl+x ctrl+a). Este comando abre además la versión con teclas (caminar, emotes, mensajes) en un panel dividido, debajo de Claude Code. Nunca la abras en una ventana aparte.
+La mini sala ya aparece sola arriba del prompt de Claude Code, animada, en cualquier terminal (es la franja de La Sala; se achica con ctrl+x ctrl+a; el tamaño se cambia con /sala-franja). Este comando abre además la versión con teclas (caminar, emotes, mensajes) en un panel dividido, debajo de Claude Code. Nunca la abras en una ventana aparte.
 
 1. Leé `~/.claude-sala.json` (en Windows `%USERPROFILE%\.claude-sala.json`). Si no existe, decile al usuario que primero configure la sala (`/sala-setup` o el mensaje de invitación) y no sigas. Nunca muestres el token.
 2. El programa está en el campo `mini` de ese archivo. Si no está, buscá `scripts/mini.js` dentro de la carpeta del plugin "sala" en `~/.claude/plugins/` (en Windows `%USERPROFILE%\.claude\plugins\`). El comando a correr es `node "<ruta de mini.js>"`, y si el argumento es "grande" agregale ` --grande`.

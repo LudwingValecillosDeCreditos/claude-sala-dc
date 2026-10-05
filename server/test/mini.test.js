@@ -217,7 +217,7 @@ test('si estás en modo invisible, la mini te lo recuerda', () => {
   assert.match(M.buildFrame(m).map(strip)[0], /Estás invisible/);
 });
 
-test('franja de Claude Code: 5 filas, sin piso, mascotas chicas bien dibujadas y la cara quieta al parpadear', () => {
+test('franja de Claude Code: tres tamaños (5, 7 y 12 filas), sin piso, mascotas chicas bien dibujadas y la cara quieta al parpadear', () => {
   const Sprites = require('../../plugin/scripts/sprites.js');
   for (const [kind, frames] of Object.entries(M.TINY_PETS)) {
     assert.ok(Sprites.PETS[kind], kind);
@@ -232,8 +232,11 @@ test('franja de Claude Code: 5 filas, sin piso, mascotas chicas bien dibujadas y
   assert.equal(M.chibiRows(Sprites.spriteGrid(u, 'parpadeo').rows, q).length, M.chibiRows(q).length);
   const m = { cols: 80, compact: true, franja: true, truecolor: true, me: 'Ana', meInfo: null, ents: [], bubbles: {}, flash: null, doneUntil: 0, now: Date.now(), input: null, connected: true,
     users: [{ name: 'Ana', web: true, claude: 'working', avatar: u.avatar, pet: { kind: 'perrito' } }] };
-  M.syncEntities(m);
-  const lines = M.buildFrame(m);
-  assert.equal(lines.length, 5);
-  assert.ok(lines.map(strip).join('').includes(M.tiny('Ana')), 'el nombre está, con letras chicas');
+  for (const [tam, filas, conNombre] of [['chica', 5, true], ['mediana', 7, true], ['grande', 12, false]]) {
+    const mt = { ...m, tam, ents: [] };
+    M.syncEntities(mt);
+    const lines = M.buildFrame(mt);
+    assert.equal(lines.length, filas, tam);
+    assert.equal(lines.map(strip).join('').includes(M.tiny('Ana')), conNombre, `${tam}: nombre`);
+  }
 });

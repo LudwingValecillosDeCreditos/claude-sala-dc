@@ -43,7 +43,7 @@ test('cada hook es válido, usa CLAUDE_PLUGIN_ROOT y manda un evento que el serv
 test('los comandos tienen descripción y nunca muestran el token', () => {
   const dir = path.join(ROOT, 'plugin/commands');
   const files = fs.readdirSync(dir).filter((f) => f.endsWith('.md'));
-  assert.deepEqual(files.sort(), ['sala-abrir.md', 'sala-diagnostico.md', 'sala-invisible.md', 'sala-mini.md', 'sala-personaje.md', 'sala-setup.md']);
+  assert.deepEqual(files.sort(), ['sala-abrir.md', 'sala-diagnostico.md', 'sala-franja.md', 'sala-invisible.md', 'sala-mini.md', 'sala-personaje.md', 'sala-setup.md']);
   for (const f of files) {
     const text = fs.readFileSync(path.join(dir, f), 'utf8');
     assert.match(text, /^---\ndescription: .+\n/, f);

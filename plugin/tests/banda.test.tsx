@@ -12,14 +12,14 @@ const SALA = {
 }
 
 // Debajo del plugin: la carpeta de usuario, ~/.claude-sala.json y el servidor.
-function pc(on: On, { config = true, server = true } = {}) {
+function pc(on: On, { config = true, server = true, franja = 'grande' } = {}) {
   const clock = mock.clock(on)
   mock.env(on, { USERPROFILE: 'C:/Users/x' })
   on('session.start', (_$, e) => ({ cwd: e.cwd }))
   on('ui.render', ($, e) => { const { Box } = $.ui.resolve(e); return <Box /> }) // el motor: franja vacía
   on('fs.read', (_$, e) => {
     if (!config || e.path.replaceAll('\\', '/') !== 'C:/Users/x/.claude-sala.json') throw new Error('no existe ' + e.path)
-    return { value: JSON.stringify({ url: 'http://10.0.0.1:3000/', token: 'tok' }) }
+    return { value: JSON.stringify({ url: 'http://10.0.0.1:3000/', token: 'tok', franja }) }
   })
   on('http.fetch', (_$, e) => {
     if (!server) throw new Error('sin conexión')
@@ -60,7 +60,7 @@ test('en la terminal dibuja la mini sala animada con los cuadros de mini.js', as
   const pedidos: string[][] = []
   on('process.spawn', async function* (_$, e) {
     pedidos.push([...e.argv])
-    const cols = Number(e.argv[e.argv.length - 1])
+    const cols = Number(e.argv[e.argv.indexOf('--celdas') + 1])
     const cells = btoa(String.fromCharCode(...new Uint8Array(new Uint32Array(cols * 2 * 3).fill(0x41).buffer)))
     yield { stream: 'stdout', text: JSON.stringify({ rows: 2, cols, cells }) + '\n' }
     await new Promise(() => {}) // mini.js sigue corriendo
@@ -70,10 +70,19 @@ test('en la terminal dibuja la mini sala animada con los cuadros de mini.js', as
   const props = { ...BAND.props, bodyColumns: 80, maxRows: 20 }
   let ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', component: 'AbovePrompt', props })
   await clock.advance(1000)
+  for (let i = 0; i < 20 && !pedidos.length; i++) await clock.advance(0) // relee la config y después arranca
   await ui.unmount()
-  expect(pedidos[0]?.slice(-2)).toEqual(['--celdas', '80'])
+  expect(pedidos[0]?.slice(-4)).toEqual(['--celdas', '80', '--tam', 'grande'])
   expect(pedidos[0]?.[1]).toContain('mini.js')
   ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', component: 'AbovePrompt', props })
   expect(await ui.find({ key: 'mini' })).toBeDefined()
+  await ui.unmount()
+})
+
+test('con /sala-franja apagada no dibuja nada', async ($, on) => {
+  pc(on, { franja: 'apagada' })
+  await $.session.start({ cwd: '.', surface: 'terminal' } as never)
+  const ui = await $.ui.mount({ plugin: 'sala', surface: 'terminal', ...BAND })
+  expect(await ui.find({ type: 'Text', text: /La Sala/ })).toBeUndefined()
   await ui.unmount()
 })

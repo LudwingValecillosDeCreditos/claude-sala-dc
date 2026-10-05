@@ -16,15 +16,18 @@ type Cuadro = { rows: number; cols: number; cells: string }
 // ponytail: variables del módulo; un hot reload las pierde y session.start las vuelve a armar
 let cuadro: Cuadro | null = null
 let anchoPedido = 0
-let anchoCorriendo = 0
+let tam = 'mediana' // "franja" en ~/.claude-sala.json: chica | mediana | grande | apagada (/sala-franja)
+let corriendo = ''
 let mini: AsyncGenerator<unknown, unknown> | null = null
 
 async function arrancarMini($: Engine) {
-  if (!anchoPedido || anchoPedido === anchoCorriendo) return
+  const quiero = tam === 'apagada' || !anchoPedido ? '' : `${anchoPedido}|${tam}`
+  if (quiero === corriendo) return
   if (mini) await mini.return(undefined).catch(() => {})
-  anchoCorriendo = anchoPedido
+  corriendo = quiero
   cuadro = null
-  const proc = $.process.spawn({ argv: ['node', `${$.plugin.root}/scripts/mini.js`, '--celdas', String(anchoPedido)] })
+  if (!quiero) { mini = null; $.ui.invalidate('ui.render'); return }
+  const proc = $.process.spawn({ argv: ['node', `${$.plugin.root}/scripts/mini.js`, '--celdas', String(anchoPedido), '--tam', tam] })
   mini = proc
   let buf = ''
   try {
@@ -41,16 +44,18 @@ async function arrancarMini($: Engine) {
       } catch {}
     }
   } catch {}
-  if (mini === proc) { mini = null; anchoCorriendo = 0; cuadro = null; $.ui.invalidate('ui.render') }
+  if (mini === proc) { mini = null; corriendo = ''; cuadro = null; $.ui.invalidate('ui.render') }
 }
 
 export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
-    let cfg: { url?: string; token?: string } = {}
+    const archivo = `${home}/.claude-sala.json`
+    let cfg: { url?: string; token?: string; franja?: string } = {}
     try {
-      cfg = JSON.parse(await $.fs.read(`${home}/.claude-sala.json`))
+      cfg = JSON.parse(await $.fs.read(archivo))
     } catch {}
+    tam = cfg.franja ?? 'mediana'
     if (cfg.url && cfg.token) {
       const url = `${cfg.url.replace(/\/+$/, '')}/api/estado?t=${encodeURIComponent(cfg.token)}`
       const poll = async () => {
@@ -64,14 +69,22 @@ export const register: Register = on => {
       void poll()
       $.clock.every(4000, () => void poll()) // ponytail: polling cada 4 s, alcanza para un equipo chico
       // la mini sala arranca (o se rearma al cambiar el ancho) cuando la franja ya sabe cuánto mide
-      $.clock.every(1000, () => void arrancarMini($))
+      // también relee el tamaño elegido, así /sala-franja se ve al instante
+      $.clock.every(1000, () => {
+        void (async () => {
+          try {
+            tam = JSON.parse(await $.fs.read(archivo)).franja ?? 'mediana'
+          } catch {}
+          await arrancarMini($)
+        })()
+      })
     }
     return next(e)
   })
 
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     const s = await read($, estado)
-    if (e.props.hasSurvey || !s || (await read($, oculta))) return next(e)
+    if (e.props.hasSurvey || !s || tam === 'apagada' || (await read($, oculta))) return next(e)
 
     if (e.surface === 'terminal') {
       anchoPedido = Math.max(44, Math.min(512, e.props.bodyColumns))
