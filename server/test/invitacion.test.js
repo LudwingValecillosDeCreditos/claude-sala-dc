@@ -13,8 +13,7 @@ test('el mensaje trae todo lo que Claude necesita para instalar solo', () => {
   const m = inviteMessage({ name: 'Flor', token: 'abc123', url: 'http://10.8.0.5:3000', repo: 'ludwing/la-sala' });
   for (const must of [
     'node -v', '.claude-sala.json', '"url": "http://10.8.0.5:3000"', '"token": "abc123"',
-    'http://10.8.0.5:3000/api/ping?t=<token>', 'extraKnownMarketplaces', '"repo": "ludwing/la-sala"',
-    '"sala@sala-equipo": true', 'sin borrar nada', '/sala-abrir',
+    'http://10.8.0.5:3000/api/ping?t=<token>', 'No toques ~/.claude/settings.json', '/sala-abrir',
     '/plugin marketplace add ludwing/la-sala', '/plugin install sala@sala-equipo', 'no lo muestres',
   ]) assert.ok(m.includes(must), must);
   // la ruta de Windows sale con una sola barra

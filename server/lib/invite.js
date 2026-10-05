@@ -17,13 +17,11 @@ Pasos:
 2. Creá el archivo .claude-sala.json en mi carpeta de usuario (~/.claude-sala.json; en Windows %USERPROFILE%\\.claude-sala.json) con este contenido:
    {"url": "${url}", "token": "${token}", "invisible": false}
 3. Probá la conexión pidiendo ${url}/api/ping?t=<token>. Tiene que responder ok con el nombre ${name}. Si no responde, decime que revise la VPN y no sigas.
-4. Agregá el plugin en ~/.claude/settings.json sin borrar nada de lo que ya tenga (si el archivo no existe, crealo):
-   - en "extraKnownMarketplaces" sumá: "sala-equipo": {"source": {"source": "github", "repo": "${r}"}}
-   - en "enabledPlugins" sumá: "sala@sala-equipo": true
-5. Cuando termines, decime que cierre y vuelva a abrir Claude Code, que acepte instalar el plugin si lo pregunta, y que después escriba /sala-abrir (la sala en el navegador) o /sala-mini (una franja dentro de la terminal).
-   Si al reabrir no existe el comando /sala-abrir, que escriba estos dos comandos y vuelva a abrir Claude Code:
+4. No toques ~/.claude/settings.json: el plugin lo instalo yo con comandos. Cuando termines, mostrame estas instrucciones tal cual:
+   "Listo. Ahora escribí estos dos comandos acá, de a uno (si pregunta algo, aceptá):
    /plugin marketplace add ${r}
-   /plugin install sala@sala-equipo`;
+   /plugin install sala@sala-equipo
+   Después cerrá y volvé a abrir Claude Code, y escribí /sala-abrir (la sala en el navegador) o /sala-mini (una franja en la terminal)."`;
 }
 
 function messagesFile({ members, url, repo }) {

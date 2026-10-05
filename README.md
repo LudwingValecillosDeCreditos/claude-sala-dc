@@ -95,7 +95,7 @@ Dejá abierta la ventana de `iniciar` mientras el equipo use la sala. Si tu PC e
 
 Pega su mensaje en Claude Code. Claude revisa que tenga Node, guarda la configuración, prueba la conexión y deja el plugin activado. Después cierra y vuelve a abrir Claude Code y escribe `/sala-abrir`.
 
-Si al reabrir no aparece `/sala-abrir`, el mensaje ya trae los dos comandos de respaldo (`/plugin marketplace add …` y `/plugin install …`).
+El plugin se instala con los dos comandos que Claude muestra al final (`/plugin marketplace add …` y `/plugin install …`): Claude Code no deja que Claude edite `~/.claude/settings.json` por su cuenta.
 
 ### Sumar a alguien después
 
