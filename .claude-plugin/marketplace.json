@@ -6,7 +6,7 @@
       "name": "sala",
       "source": "./plugin",
       "description": "Muestra en La Sala del equipo si estás trabajando con Claude o libre, con tu personaje.",
-      "version": "0.8.0"
+      "version": "0.8.1"
     }
   ]
 }

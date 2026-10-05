@@ -1,6 +1,6 @@
 {
   "name": "sala",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Reporta tu estado (trabajando, esperando, libre) a La Sala del equipo. Solo envía el estado y el nombre de la herramienta, nunca prompts ni código.",
   "author": {
     "name": "Ludwing"
