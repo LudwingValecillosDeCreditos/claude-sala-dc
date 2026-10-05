@@ -13,7 +13,7 @@ const Sprites = require('./sprites.js');
 
 const EMOTES = ['👋', '🎉', '☕', '🔥', '😂', '👍', '🤯', '🍕'];
 // Tamaños ya dibujados (con contorno). Grande: personaje 18x26, mascota 18x14. Compacto: 10x14 y 10x8.
-const DIMS = { false: { aw: 18, ah: 26, pw: 18, ph: 14 }, true: { aw: 12, ah: 14, pw: 12, ph: 8 } };
+const DIMS = { false: { aw: 18, ah: 26, pw: 18, ph: 14 }, true: { aw: 11, ah: 12, pw: 11, ph: 7 } };
 const FLOOR = ['#c98a65', '#9c5a40'];
 
 // ================= colores =================
@@ -84,7 +84,7 @@ function shrinkRows(rows) {
   return out;
 }
 // Chico: en vez de promediar bloques de 2x2 (se pierden caras y gorros), se eligen filas y columnas del dibujo
-// original obligando a quedarse con las de los ojos, la boca y los pies. Cabeza 8 filas, cuerpo 4, 10 de ancho.
+// original obligando a quedarse con las de los ojos, la boca y los pies. Cabeza 7 filas, cuerpo 3, 9 de ancho.
 function pick(n, from, to, must = []) {
   const out = Array.from({ length: n }, (_, i) => Math.round(from + (i * (to - from)) / Math.max(1, n - 1)));
   for (const m of must) {
@@ -101,18 +101,18 @@ function chibiRows(rows, split = 13) {
   const top = Math.max(0, rows.findIndex((r) => /[^.]/.test(r)));
   const head = rows.slice(0, split);
   const eye = rowsWith(head, /E/)[0], mouth = rowsWith(head, /m/)[0];
-  const R = [...pick(8, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(4, split, rows.length - 1, [split, rows.length - 1])];
+  const R = [...pick(7, top, split - 1, [eye, mouth].filter((x) => x !== undefined)), ...pick(3, split, rows.length - 1, [split, rows.length - 1])];
   const ecols = eye === undefined ? [] : [...rows[eye]].map((c, i) => (c === 'E' ? i : -1)).filter((i) => i >= 0);
   const filled = rows.filter((r) => /[^.]/.test(r));
   const left = Math.min(...filled.map((r) => r.search(/[^.]/)));
   const right = Math.max(...filled.map((r) => r.length - 1 - [...r].reverse().join('').search(/[^.]/)));
-  return sample(rows, R, pick(10, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
+  return sample(rows, R, pick(9, left, right, ecols.length ? [ecols[0], ecols[ecols.length - 1]] : []));
 }
 function petChibiRows(rows) {
   const eye = rowsWith(rows, /E/)[0];
   const top = Math.max(0, rows.findIndex((r) => /[^.]/.test(r)));
   const ecol = eye === undefined ? -1 : rows[eye].indexOf('E');
-  return sample(rows, pick(6, top, rows.length - 1, [eye, rows.length - 1].filter((x) => x !== undefined)), pick(10, 0, rows[0].length - 1, ecol >= 0 ? [ecol] : []));
+  return sample(rows, pick(5, top, rows.length - 1, [eye, rows.length - 1].filter((x) => x !== undefined)), pick(9, 0, rows[0].length - 1, ecol >= 0 ? [ecol] : []));
 }
 // Grande: mismo motor que la sala del navegador (luz, sombra y contorno de color). Compacto: plano con contorno.
 const cache = new Map();
@@ -192,6 +192,9 @@ function buildFrame(model) {
   for (let x = 0; x < cols; x++) { canvas[pixH - 2][x] = FLOOR[0]; canvas[pixH - 1][x] = FLOOR[1]; }
 
   const tags = textRow(cols), bubbles = textRow(cols);
+  // franja de Claude Code: sin filas de texto; los nombres (o la burbuja) van escritos sobre el piso
+  const FLOOR_ST = '38;2;58;34;24;48;2;201;138;101', ME_ST = '1;38;2;255;255;255;48;2;156;90;64';
+  const floor = Array.from({ length: cols }, () => ({ ch: ' ', st: FLOOR_ST }));
   const ents = [...model.ents].sort((a, b) => (a.name === model.me) - (b.name === model.me)); // vos adelante
   for (const e of ents) {
     const u = model.users.find((x) => x.name === e.name);
@@ -214,12 +217,13 @@ function buildFrame(model) {
     // nombre arriba
     const tag = fitText(plain(u.name) || '?', 14);
     const tx = x + Math.floor(aw / 2) - Math.floor(textWidth(tag) / 2);
-    put(tags, tx, tag, u.name === model.me ? '1;30;48;5;75' : '1;97;48;5;236');
+    if (model.franja) put(floor, tx, tag, u.name === model.me ? ME_ST : FLOOR_ST);
+    else put(tags, tx, tag, u.name === model.me ? '1;30;48;5;75' : '1;97;48;5;236');
     // burbuja
     const b = model.bubbles[u.name];
     if (b && b.until > now) {
       const txt = b.emote ? b.text : ` ${fitText(b.text, 28)} `;
-      put(model.franja ? tags : bubbles, x + Math.floor(aw / 2) - Math.floor(textWidth(txt) / 2), txt, b.emote ? '' : '30;107');
+      put(model.franja ? floor : bubbles, x + Math.floor(aw / 2) - Math.floor(textWidth(txt) / 2), txt, b.emote ? (model.franja ? FLOOR_ST : '') : '30;107');
     }
   }
 
@@ -249,9 +253,7 @@ function buildFrame(model) {
     put(status, cols - textWidth(right), right, rst);
   }
 
-  // franja de Claude Code: nombre (o burbuja), personajes y el estado como piso: 9 filas en vez de 11
-  if (!model.franja) { lines.push(rowToString(status)); lines.push(rowToString(bubbles)); }
-  lines.push(rowToString(tags));
+  if (!model.franja) { lines.push(rowToString(status)); lines.push(rowToString(bubbles)); lines.push(rowToString(tags)); }
 
   // ----- píxeles: 2 por carácter -----
   for (let r = 0; r < pixH; r += 2) {
@@ -270,7 +272,11 @@ function buildFrame(model) {
   }
 
   // ----- pie: teclas o el mensaje que estás escribiendo -----
-  if (model.franja) { lines[lines.length - 1] = rowToString(status); return lines; }
+  if (model.franja) {
+    if (!model.connected) put(floor, cols - 16, ' sin conexión… ', '1;97;48;5;160');
+    lines[lines.length - 1] = rowToString(floor); // 7 filas: personajes y el piso con los nombres
+    return lines;
+  }
   const foot = textRow(cols);
   if (model.input !== null && model.input !== undefined) {
     put(foot, 0, fitText(` Mensaje: ${model.input}▏  (Enter manda · Esc cancela)`, cols), '97;48;5;238');

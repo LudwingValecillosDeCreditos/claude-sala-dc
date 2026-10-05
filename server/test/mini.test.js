@@ -114,7 +114,7 @@ describe('Mini sala: dibujo', () => {
       const m = model({ compact, cols, bubbles: { Flor: { text: '👋', emote: true, until: Date.now() + 9e3 }, Ludwing: { text: 'hola ☕ equipo', until: Date.now() + 9e3 } } });
       M.syncEntities(m, Math.random);
       const lines = M.buildFrame(m);
-      assert.equal(lines.length, compact ? 12 : 18);
+      assert.equal(lines.length, compact ? 11 : 18);
       for (const l of lines) assert.equal(M.textWidth(strip(l)), cols, `${compact ? 'chico' : 'grande'} ${cols}: ${JSON.stringify(strip(l)).slice(0, 60)}`);
     }
   });
